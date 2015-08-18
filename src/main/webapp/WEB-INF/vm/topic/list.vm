@@ -3,7 +3,10 @@
       <button class="btn btn-sm btn-success" type="button" onclick="add()">Add</button>
       </div>
 	  <p>&nbsp;</p>
-      <div class="container theme-showcase"><!-- /container  -->
+      <div class="container theme-showcase"><!-- /container  --> 
+      		<label for="show_retry"><input type="checkbox" name="show_retry" id="show_retry" /> Show Retry</label>
+      		<label for="show_group"><input type="checkbox" name="show_group" id="show_group" /> Show Group List</label>
+      		<br/>
     		<table class="table table-bordered table-hover">  
                   <thead>  
                     <tr>  
@@ -12,11 +15,14 @@
                     </tr>  
                   </thead>  
                   <tbody>
+                  #set ($CHARSEQ = "%RETRY%")
+                  #set ($CHARLEN = $CHARSEQ.length())
     			  #foreach($tr in $!table.tbodyData)
-    					<tr>
-    						#foreach($topicName in $tr)
-    						  <td>$topicName</td>
-    						  <td> 
+    			  		#set ($topicName = $tr[0])
+			  			#set ($isGroup = ($topicName.length() > $CHARLEN && ($topicName.substring(0, $CHARLEN).toUpperCase() == "%RETRY%")))
+    					<tr id="$topicName" #if($isGroup) class="topic-group" #end style="display:#if($isGroup) none #end">
+    						  <td>$topicName<span class="extData" style="display:none;">$!table.extData[$topicName]</span></td>
+    						  <td width="25%" nowrap="nowrap"> 
     							<button class="btn btn-sm btn-info" type="button" onclick="stat('$topicName')">Stat</button>
     							&nbsp;&nbsp;  
     							<button class="btn btn-sm btn-info" type="button" onclick="route('$topicName')">Route</button>
@@ -24,13 +30,18 @@
     							<button class="btn btn-sm btn-info" type="button" onclick="upd('$topicName')">Update</button>
     							&nbsp;&nbsp; 
                                 <button class="btn btn-sm btn-danger" type="button" onclick="del('$topicName')">Delete</button>
+                                #if ($isGroup)
+                                #set ($gname = $topicName.substring($CHARLEN))
+    							&nbsp;&nbsp; 
+                                <button class="btn btn-sm btn-info" type="button" onclick="progress('$gname')">Progress</button>
+                                #end
     						  </td>
-    						 #end
         				</tr>
     			  #end
                   </tbody>
             </table>
       </div><!-- container-->
+      <script src="$root/js/jquery-1.10.2.min.js"></script>
       <script language="javascript">
     	function add() {
     		window.location.href = "add.do";
@@ -51,4 +62,67 @@
     	function upd(topicName) {
     		window.location.href = "update.do?topic=" + topicName;
     	}
+    
+    	function progress(topicGroupName) {
+    		var target = "$root/consumer/consumerProgress.do?groupName=" + topicGroupName;
+    		post(target);
+    	}
+    
+    	function connection(topicGroupName) {
+    		var target = "$root/connection/consumerConnection.do?consumerGroup=" + topicGroupName;
+    		post(target);
+    	}
+    	
+    	function post(target) {
+    		$("<form target='_blank' method='post' action='" + target + "' />").submit();
+    	}
+    	
+    	jQuery(function($){
+    		$("#show_retry").click(function(){
+    			if ($(this).is(":checked")) {
+    				$(".topic-group").show();
+    			} else {
+    				$(".topic-group").hide();
+    			}
+    		});
+    		$("#show_group").click(function(){
+    			if ($(this).is(":checked")) {
+    				$(".group-list").show();
+    				$(".toggleGroupList").removeClass("glyphicon-chevron-down").addClass("glyphicon-chevron-up");
+    			} else {
+    				$(".group-list").hide();
+    				$(".toggleGroupList").removeClass("glyphicon-chevron-up").addClass("glyphicon-chevron-down");
+    			}
+    		});
+    		
+    		$(".extData").each(function(){
+    			var text = $(this).text();
+    			if ($.trim(text).length == 0) return;
+    			
+    			var htmls = [];
+    			htmls.push("<span class='glyphicon glyphicon-chevron-down toggleGroupList' aria-hidden='true'></span>");
+    			htmls.push("<ul class='group-list' style='display:none;'>");
+    			$.each(text.split(','), function(i, group){
+    				var a_conn = "<a href='javascript:void(0);' onclick='connection(\"" + group + "\")'>connection</a>";
+    				var a_prog = "<a href='javascript:void(0);' onclick='progress(\"" + group + "\")'>progress</a>";
+    				htmls.push("<li>" + group + "  [" + a_conn + " | " +  a_prog + "]</li>");
+    			});
+    			htmls.push("</ul>");
+    			$(this).after(htmls.join(''));
+    			
+    			$(".toggleGroupList").css({"margin-left": "10px", "cursor": "pointer"});
+    		});
+    		
+    		$(".table").delegate(".toggleGroupList", "click", function(){
+    			var $list = $(this).next();
+    			console.log($list.html())
+    			if ($list.is(":hidden")) {
+    				$list.slideDown();
+    				$(this).removeClass("glyphicon-chevron-down").addClass("glyphicon-chevron-up");
+    			} else {
+    				$list.slideUp();
+    				$(this).removeClass("glyphicon-chevron-up").addClass("glyphicon-chevron-down");
+    			}
+    		});
+    	});
     </script>

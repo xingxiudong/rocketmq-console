@@ -7,3 +7,7 @@ bin
 
 .idea
 *.iml
+/.settings/
+/.gitignore
+/.project
+/.classpath

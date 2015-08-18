@@ -6,6 +6,7 @@ import com.alibaba.rocketmq.common.UtilAll;
 import com.alibaba.rocketmq.common.admin.TopicOffset;
 import com.alibaba.rocketmq.common.admin.TopicStatsTable;
 import com.alibaba.rocketmq.common.message.MessageQueue;
+import com.alibaba.rocketmq.common.protocol.body.GroupList;
 import com.alibaba.rocketmq.common.protocol.body.TopicList;
 import com.alibaba.rocketmq.common.protocol.route.TopicRouteData;
 import com.alibaba.rocketmq.tools.admin.DefaultMQAdminExt;
@@ -16,15 +17,20 @@ import com.alibaba.rocketmq.tools.command.topic.TopicRouteSubCommand;
 import com.alibaba.rocketmq.tools.command.topic.TopicStatusSubCommand;
 import com.alibaba.rocketmq.tools.command.topic.UpdateTopicSubCommand;
 import com.alibaba.rocketmq.validate.CmdTrace;
+
 import org.apache.commons.cli.Option;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.text.CollationKey;
+import java.text.Collator;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,8 +48,18 @@ public class TopicService extends AbstractService {
 
     static final Logger logger = LoggerFactory.getLogger(TopicService.class);
 
+	public static class CollatorComparator<T> implements Comparator<T> {
+		Collator collator = Collator.getInstance();
 
-    @CmdTrace(cmdClazz = TopicListSubCommand.class)
+		public int compare(T element1, T element2) {
+			CollationKey key1 = collator.getCollationKey(element1.toString());
+			CollationKey key2 = collator.getCollationKey(element2.toString());
+			return key1.compareTo(key2);
+		}
+	}
+
+
+	@CmdTrace(cmdClazz = TopicListSubCommand.class)
     public Table list() throws Throwable {
         Throwable t = null;
         DefaultMQAdminExt defaultMQAdminExt = getDefaultMQAdminExt();
@@ -53,10 +69,18 @@ public class TopicService extends AbstractService {
             int row = topicList.getTopicList().size();
             if (row > 0) {
                 Table table = new Table(new String[] { "topic" }, row);
-                for (String topicName : topicList.getTopicList()) {
+                
+                // add by xdxing to improved sort
+                List<String> tompicNameList = new ArrayList<String>(topicList.getTopicList());
+                Collections.sort(tompicNameList, new CollatorComparator<String>());
+                for (String topicName : tompicNameList) {
                     Object[] tr = table.createTR();
                     tr[0] = topicName;
                     table.insertTR(tr);
+                    
+                    // add group list
+                    GroupList groupList = defaultMQAdminExt.queryTopicConsumeByWho(topicName);
+                    table.addExtData(topicName,  StringUtils.join(groupList.getGroupList(), ","));
                 }
                 return table;
             }
